@@ -7,19 +7,21 @@ import {
   Camera, 
   Save, 
   Eye,
+  EyeOff,
   Loader2
 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardBody } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
-import { useGetMeQuery } from '@/store/services/authApi';
+import { useGetMeQuery, useResetPasswordMutation } from '@/store/services/authApi';
 import { useUpdateUserProfileMutation } from '@/store/services/profileApi';
 import { alerts } from '@/lib/sweetalert';
 
 export default function ProfilePage() {
   const { data: userResponse, isLoading: isUserLoading } = useGetMeQuery();
   const [updateProfile, { isLoading: isUpdating }] = useUpdateUserProfileMutation();
+  const [resetPasswordApi, { isLoading: isChangingPassword }] = useResetPasswordMutation();
   
   const user = userResponse?.data;
   
@@ -28,6 +30,12 @@ export default function ProfilePage() {
   const [profileImage, setProfileImage] = useState<File | null>(null);
   const [previewImage, setPreviewImage] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Security / password change state
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -55,6 +63,25 @@ export default function ProfilePage() {
       alerts.toastSuccess("Profile updated successfully");
     } catch (err: any) {
       alerts.error("Failed to update profile", err?.data?.message || err?.message);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword.length < 8) {
+      alerts.toastError('New password must be at least 8 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      alerts.toastError('Passwords do not match.');
+      return;
+    }
+    try {
+      await resetPasswordApi({ email: user?.email ?? '', newPassword }).unwrap();
+      alerts.toastSuccess('Password updated successfully!');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      alerts.error('Password Update Failed', err?.data?.message || err?.message || 'Failed to update password.');
     }
   };
 
@@ -154,13 +181,42 @@ export default function ProfilePage() {
             </CardHeader>
             <CardBody className="space-y-6 pt-6">
               <div className="space-y-6">
-                <Input label="Current Password" type="password" placeholder="Enter current password" suffix={<Eye size={16} />} className="bg-[#f2f2f2] border-none text-black h-11" />
-                <Input label="New Password" type="password" placeholder="Enter new password" suffix={<Eye size={16} />} className="bg-[#f2f2f2] border-none text-black h-11" />
-                <Input label="Confirm New Password" type="password" placeholder="Confirm new password" suffix={<Eye size={16} />} className="bg-[#f2f2f2] border-none text-black h-11" />
+                <Input
+                  label="New Password"
+                  type={showNewPw ? 'text' : 'password'}
+                  placeholder="Enter new password"
+                  value={newPassword}
+                  onChange={(e: any) => setNewPassword(e.target.value)}
+                  suffix={
+                    <button type="button" onClick={() => setShowNewPw((v) => !v)} className="text-text-muted hover:text-gray-900 transition-colors">
+                      {showNewPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  }
+                  className="bg-[#f2f2f2] border-none text-black h-11"
+                />
+                <Input
+                  label="Confirm New Password"
+                  type={showConfirmPw ? 'text' : 'password'}
+                  placeholder="Confirm new password"
+                  value={confirmPassword}
+                  onChange={(e: any) => setConfirmPassword(e.target.value)}
+                  suffix={
+                    <button type="button" onClick={() => setShowConfirmPw((v) => !v)} className="text-text-muted hover:text-gray-900 transition-colors">
+                      {showConfirmPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  }
+                  className="bg-[#f2f2f2] border-none text-black h-11"
+                />
               </div>
               <div className="flex justify-end pt-2">
-                <Button variant="primary" className="gap-2 px-6 font-bold shadow-sm">
-                  <Save size={16} /> Update Password
+                <Button
+                  variant="primary"
+                  className="gap-2 px-6 font-bold shadow-sm"
+                  onClick={handleChangePassword}
+                  disabled={isChangingPassword}
+                >
+                  {isChangingPassword ? <Loader2 className="animate-spin w-4 h-4" /> : <Save size={16} />}
+                  Update Password
                 </Button>
               </div>
             </CardBody>
