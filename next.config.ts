@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // ── Local-dev proxy (kept as fallback) ────────────────────────────────────
+  // When NEXT_PUBLIC_API_URL is not set the baseApi falls back to the live URL
+  // directly. This rewrite is only hit if you switch baseUrl back to '/api/v1'.
   async rewrites() {
     return [
       {

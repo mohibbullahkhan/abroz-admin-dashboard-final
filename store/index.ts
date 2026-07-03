@@ -13,6 +13,7 @@ export {
   useForgotPasswordMutation,
   useVerifyOtpMutation,
   useResetPasswordMutation,
+  useChangePasswordMutation,
   useGetMeQuery,
 } from './services/authApi';
 export type {
@@ -21,6 +22,7 @@ export type {
   ForgotPasswordRequest,
   VerifyOtpRequest,
   ResetPasswordRequest,
+  ChangePasswordRequest,
 } from './services/authApi';
 
 // Products
@@ -46,6 +48,22 @@ export {
   useDeleteCategoryMutation,
 } from './services/categoriesApi';
 
+// Customers
+export {
+  useGetCustomersQuery,
+  useGetCustomerQuery,
+  useCreateCustomerMutation,
+  useUpdateCustomerMutation,
+  useDeleteCustomerMutation,
+  useCreateBroadcastMutation,
+} from './services/customersApi';
+export type {
+  CustomerFilters,
+  CreateCustomerRequest,
+  UpdateCustomerRequest,
+  CreateBroadcastRequest,
+} from './services/customersApi';
+
 // Dashboard
 export { useGetDashboardStatsQuery } from './services/dashboardApi';
 export type { DashboardResponse } from './services/dashboardApi';
@@ -61,3 +79,5 @@ export {
 export {
   useUpdateUserProfileMutation,
 } from './services/profileApi';
+
+

@@ -7,17 +7,22 @@ import {
   Filter, 
   Search,
   ArrowUpRight,
-  ChevronDown
+  Loader2,
+  Eye
 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardBody } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
-import { mockProducts } from '@/lib/data/mockData';
 import { cn } from '@/lib/utils';
+import { useGetDashboardStatsQuery } from '@/store/services/dashboardApi';
 
 export default function ReportsPage() {
+  const { data, isLoading } = useGetDashboardStatsQuery();
+  const stats = data?.data;
+  const topProducts = stats?.topViewedProducts || [];
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <PageHeader 
@@ -32,45 +37,59 @@ export default function ReportsPage() {
         </Button>
       </PageHeader>
 
-      {/* Summary Row */}
+      {/* Summary Row — real data from /stats/dashboard */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="bg-primary/5 border-primary/20">
           <CardBody className="p-6">
-            <p className="text-xs font-bold text-primary uppercase tracking-widest">Total Tracked</p>
-            <h3 className="text-3xl font-bold mt-1">{mockProducts.length} Products</h3>
+            <p className="text-xs font-bold text-primary uppercase tracking-widest">Total Products</p>
+            <h3 className="text-3xl font-bold mt-1">
+              {isLoading ? '—' : stats?.products?.total ?? 0}
+            </h3>
             <p className="text-xs text-text-muted mt-2 flex items-center gap-1">
               <ArrowUpRight size={12} className="text-success" />
-              +5 added this week
+              {stats?.products?.todayCount ?? 0} added today
             </p>
           </CardBody>
         </Card>
         <Card>
           <CardBody className="p-6">
-            <p className="text-xs font-bold text-text-muted uppercase tracking-widest">Best Category</p>
-            <h3 className="text-2xl font-bold mt-1">Engine Parts</h3>
-            <p className="text-xs text-text-muted mt-2">Highest engagement rate</p>
+            <p className="text-xs font-bold text-text-muted uppercase tracking-widest">Total Categories</p>
+            <h3 className="text-3xl font-bold mt-1">
+              {isLoading ? '—' : stats?.categories?.total ?? 0}
+            </h3>
+            <p className="text-xs text-text-muted mt-2">
+              {stats?.categories?.todayCount ?? 0} added today
+            </p>
           </CardBody>
         </Card>
         <Card>
           <CardBody className="p-6">
-            <p className="text-xs font-bold text-text-muted uppercase tracking-widest">Highest CTR</p>
-            <h3 className="text-2xl font-bold mt-1">CAT 320 Pump</h3>
-            <p className="text-xs text-text-muted mt-2">12.4% conversion</p>
+            <p className="text-xs font-bold text-text-muted uppercase tracking-widest">WhatsApp Clicks</p>
+            <h3 className="text-3xl font-bold mt-1">
+              {isLoading ? '—' : stats?.whatsappClicks?.total ?? 0}
+            </h3>
+            <p className="text-xs text-text-muted mt-2">
+              {stats?.whatsappClicks?.todayCount ?? 0} today
+            </p>
           </CardBody>
         </Card>
         <Card>
           <CardBody className="p-6">
-            <p className="text-xs font-bold text-text-muted uppercase tracking-widest">Total Inquiries</p>
-            <h3 className="text-3xl font-bold mt-1">2,080</h3>
-            <p className="text-xs text-text-muted mt-2">via WhatsApp & Messenger</p>
+            <p className="text-xs font-bold text-text-muted uppercase tracking-widest">Messenger Clicks</p>
+            <h3 className="text-3xl font-bold mt-1">
+              {isLoading ? '—' : stats?.messengerClicks?.total ?? 0}
+            </h3>
+            <p className="text-xs text-text-muted mt-2">
+              {stats?.messengerClicks?.todayCount ?? 0} today
+            </p>
           </CardBody>
         </Card>
       </div>
 
-      {/* Report Table */}
+      {/* Top Products Report Table — real data */}
       <Card>
         <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <h3 className="font-bold text-lg">Product Performance Report</h3>
+          <h3 className="font-bold text-lg">Top Viewed Products Report</h3>
           <div className="flex items-center gap-3">
             <div className="relative">
               <Input 
@@ -85,52 +104,70 @@ export default function ReportsPage() {
           </div>
         </CardHeader>
         <CardBody className="p-0 overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-border bg-white/[0.02]">
-                <th className="px-6 py-4 text-xs font-semibold text-text-muted uppercase">Product Name</th>
-                <th className="px-6 py-4 text-xs font-semibold text-text-muted uppercase">Category</th>
-                <th className="px-6 py-4 text-xs font-semibold text-text-muted uppercase text-right">Clicks</th>
-                <th className="px-6 py-4 text-xs font-semibold text-text-muted uppercase text-right">WA</th>
-                <th className="px-6 py-4 text-xs font-semibold text-text-muted uppercase text-right">MS</th>
-                <th className="px-6 py-4 text-xs font-semibold text-text-muted uppercase text-right">CTR%</th>
-                <th className="px-6 py-4 text-xs font-semibold text-text-muted uppercase text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {mockProducts.slice(0, 15).map((p) => {
-                const ctr = p.clicks > 0 ? "10.0" : "0.0"; // Placeholder CTR without impressions
-                return (
+          {isLoading ? (
+            <div className="flex justify-center items-center py-16">
+              <Loader2 className="animate-spin text-primary w-7 h-7" />
+            </div>
+          ) : topProducts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-text-muted">
+              <FileText size={36} className="mb-3 opacity-30" />
+              <p className="text-sm">No product performance data yet.</p>
+            </div>
+          ) : (
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-border bg-white/[0.02]">
+                  <th className="px-6 py-4 text-xs font-semibold text-text-muted uppercase">#</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-text-muted uppercase">Product Name</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-text-muted uppercase">Category</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-text-muted uppercase text-right">Total Clicks</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-text-muted uppercase text-right">Growth</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {topProducts.map((p, idx) => (
                   <tr key={p.id} className="hover:bg-white/5 transition-colors group">
-                    <td className="px-6 py-4 text-sm font-medium text-text-primary">{p.name}</td>
+                    <td className="px-6 py-4 text-sm text-text-muted font-mono">{idx + 1}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-white/5 border border-border overflow-hidden shrink-0">
+                          {p.images?.[0] ? (
+                            <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-text-muted">AB</div>
+                          )}
+                        </div>
+                        <span className="text-sm font-medium text-text-primary">{p.name}</span>
+                      </div>
+                    </td>
                     <td className="px-6 py-4">
                       <Badge variant="neutral" className="text-[10px]">{p.category}</Badge>
                     </td>
-                    <td className="px-6 py-4 text-sm text-right text-text-muted">{p.clicks.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-sm text-right text-text-muted">{p.whatsappClicks}</td>
-                    <td className="px-6 py-4 text-sm text-right text-text-muted">{p.messengerClicks}</td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-1 text-sm font-medium text-text-primary">
+                        <Eye size={13} className="text-text-muted" />
+                        {p.totalClicks.toLocaleString()}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 text-right">
                       <span className={cn(
                         "text-sm font-bold",
-                        Number(ctr) > 10 ? "text-success" : "text-text-muted"
-                      )}>{ctr}%</span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <Badge variant={p.status === 'Active' ? 'success' : 'neutral'}>{p.status}</Badge>
+                        p.growthPercent >= 0 ? "text-success" : "text-danger"
+                      )}>
+                        {p.growthPercent >= 0 ? '+' : ''}{p.growthPercent}%
+                      </span>
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          )}
         </CardBody>
-        <div className="p-6 border-t border-border flex items-center justify-between">
-          <p className="text-sm text-text-muted">Showing 1 to 15 of {mockProducts.length} entries</p>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm">Previous</Button>
-            <Button variant="outline" size="sm">Next</Button>
+        {!isLoading && topProducts.length > 0 && (
+          <div className="p-6 border-t border-border flex items-center justify-between">
+            <p className="text-sm text-text-muted">Showing top {topProducts.length} products by clicks</p>
           </div>
-        </div>
+        )}
       </Card>
     </div>
   );

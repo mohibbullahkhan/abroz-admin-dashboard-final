@@ -8,7 +8,8 @@ import {
   MousePointer2, 
   MessageSquare, 
   Send,
-  Layers
+  Layers,
+  Loader2
 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/Button';
@@ -16,10 +17,35 @@ import { StatsCard } from '@/components/dashboard/StatsCard';
 import { AreaChart } from '@/components/charts/AreaChart';
 import { BarChart } from '@/components/charts/BarChart';
 import { PieChart } from '@/components/charts/PieChart';
-import { mockAnalytics, mockProducts } from '@/lib/data/mockData';
+import { useGetDashboardStatsQuery } from '@/store/services/dashboardApi';
 
 export default function AnalyticsPage() {
-  const sparklineData = Array.from({ length: 10 }, () => ({ value: Math.floor(Math.random() * 100) }));
+  const { data, isLoading } = useGetDashboardStatsQuery();
+  const stats = data?.data;
+
+  // Transform real API data for charts
+  const trafficData = (stats?.productClicksLast30Days || []).map((item) => ({
+    date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    clicks: item.count,
+  }));
+
+  const channelData = [
+    { name: 'WhatsApp', value: stats?.whatsappClicks?.total || 0, color: '#25D366' },
+    { name: 'Messenger', value: stats?.messengerClicks?.total || 0, color: '#0084FF' },
+  ];
+
+  const topProductsChartData = (stats?.topViewedProducts || []).map((p) => ({
+    name: p.name,
+    clicks: p.totalClicks,
+  }));
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="animate-spin text-primary w-8 h-8" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -42,70 +68,74 @@ export default function AnalyticsPage() {
         </Button>
       </PageHeader>
 
-      {/* KPI Row */}
+      {/* KPI Row — real data from /stats/dashboard */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard 
-          title="Product Opens" 
-          value="12.8K" 
-          change={8} 
+          title="Total Products" 
+          value={stats?.products?.total ?? 0} 
+          change={stats?.products?.growthPercent ?? 0} 
           icon={Layers} 
         />
         <StatsCard 
-          title="WhatsApp" 
-          value="2.4K" 
-          change={21} 
+          title="WhatsApp Clicks" 
+          value={stats?.whatsappClicks?.total ?? 0} 
+          change={stats?.whatsappClicks?.growthPercent ?? 0} 
           icon={MessageSquare} 
         />
         <StatsCard 
-          title="Messenger" 
-          value="1.9K" 
-          change={12} 
+          title="Messenger Clicks" 
+          value={stats?.messengerClicks?.total ?? 0} 
+          change={stats?.messengerClicks?.growthPercent ?? 0} 
           icon={Send} 
         />
         <StatsCard 
-          title="Category Clicks" 
-          value="8.2K" 
-          change={-4} 
+          title="Total Categories" 
+          value={stats?.categories?.total ?? 0} 
+          change={stats?.categories?.growthPercent ?? 0} 
           icon={MousePointer2} 
         />
       </div>
 
-      {/* Main Charts */}
+      {/* Main Charts — real data */}
       <div className="space-y-6">
         <AreaChart 
-          title="Traffic & Engagement Overview" 
-          data={mockAnalytics.dailyTraffic}
+          title="Product Clicks (Last 30 Days)" 
+          data={trafficData}
           categories={[
-            { key: 'clicks', color: '#10B981', name: 'Engagement (Clicks)' }
+            { key: 'clicks', color: '#10B981', name: 'Total Clicks' }
           ]}
           height={400}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-          <BarChart 
-            title="Top 10 Products by Clicks" 
-            data={mockProducts.slice(0, 10).sort((a,b) => b.clicks - a.clicks)}
-            dataKey="clicks"
-            nameKey="name"
-            color="#10B981"
-            height={400}
-          />
-        </div>
+        {topProductsChartData.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+            <BarChart 
+              title="Top 5 Products by Clicks" 
+              data={topProductsChartData}
+              dataKey="clicks"
+              nameKey="name"
+              color="#10B981"
+              height={400}
+            />
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <PieChart 
             title="Inquiry Method Distribution" 
-            data={mockAnalytics.inquiriesByChannel}
+            data={channelData}
           />
-          <div className="lg:col-span-2">
-            <BarChart 
-              title="Category Performance (Total Clicks)" 
-              data={mockAnalytics.topCategories}
-              dataKey="views"
-              nameKey="name"
-              color="#F59E0B"
-            />
-          </div>
+          {topProductsChartData.length > 0 && (
+            <div className="lg:col-span-2">
+              <BarChart 
+                title="Top Products Click Performance" 
+                data={topProductsChartData}
+                dataKey="clicks"
+                nameKey="name"
+                color="#F59E0B"
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

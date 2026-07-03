@@ -46,7 +46,7 @@ export default function ProductsPage() {
         page: currentPage,
         limit: itemsPerPage,
         search: debouncedSearch || undefined,
-        category: category !== "All" ? category : undefined,
+        categoryId: category !== "All" ? category : undefined,
         status: statusFilter !== "All" ? statusFilter.toLowerCase() : undefined,
     });
 

@@ -10,7 +10,6 @@ import {
     Tag,
     BarChart3,
     FileText,
-    Bell,
     Image as ImageIcon,
     Clock,
     Settings,

@@ -6,8 +6,9 @@ import { baseApi } from './api/baseApi';
 import './services/authApi';
 import './services/productsApi';
 import './services/categoriesApi';
+import './services/customersApi';
 import './services/dashboardApi';
-import './services/smsApi';
+import './services/adminApi';
 import './services/profileApi';
 
 // ── Store ─────────────────────────────────────────────────────────────────────

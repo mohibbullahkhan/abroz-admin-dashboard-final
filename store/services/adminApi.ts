@@ -9,6 +9,7 @@ export interface AdminInfoResponse {
 }
 
 export type UpdateAdminProfileRequest = {
+  businessName?: string;
   businessDescription?: string;
   businessAddress?: string;
   shippingInfo?: string;

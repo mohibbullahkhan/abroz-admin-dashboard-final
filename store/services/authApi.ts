@@ -7,7 +7,7 @@ export interface LoginRequest {
 }
 
 export interface User {
-  id: string; // the doc says _id, but response example shows id
+  id: string;
   name: string;
   email: string;
   role: string;
@@ -40,6 +40,11 @@ export interface VerifyOtpRequest {
 
 export interface ResetPasswordRequest {
   email: string;
+  newPassword: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
   newPassword: string;
 }
 
@@ -84,6 +89,15 @@ export const authApi = baseApi.injectEndpoints({
       }),
     }),
 
+    // PATCH /auth/change-password — requires auth cookie (admin only)
+    changePassword: builder.mutation<GenericResponse, ChangePasswordRequest>({
+      query: (body) => ({
+        url: '/auth/change-password',
+        method: 'PATCH',
+        body,
+      }),
+    }),
+
     // GET /auth/me
     getMe: builder.query<{ success: boolean; data: User }, void>({
       query: () => '/auth/me',
@@ -99,5 +113,6 @@ export const {
   useForgotPasswordMutation,
   useVerifyOtpMutation,
   useResetPasswordMutation,
+  useChangePasswordMutation,
   useGetMeQuery,
 } = authApi;

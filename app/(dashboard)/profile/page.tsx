@@ -14,14 +14,14 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardBody } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
-import { useGetMeQuery, useResetPasswordMutation } from '@/store/services/authApi';
+import { useGetMeQuery, useChangePasswordMutation } from '@/store/services/authApi';
 import { useUpdateUserProfileMutation } from '@/store/services/profileApi';
 import { alerts } from '@/lib/sweetalert';
 
 export default function ProfilePage() {
   const { data: userResponse, isLoading: isUserLoading } = useGetMeQuery();
   const [updateProfile, { isLoading: isUpdating }] = useUpdateUserProfileMutation();
-  const [resetPasswordApi, { isLoading: isChangingPassword }] = useResetPasswordMutation();
+  const [changePasswordApi, { isLoading: isChangingPassword }] = useChangePasswordMutation();
   
   const user = userResponse?.data;
   
@@ -32,8 +32,10 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Security / password change state
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
   const [showNewPw, setShowNewPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
 
@@ -67,6 +69,10 @@ export default function ProfilePage() {
   };
 
   const handleChangePassword = async () => {
+    if (!currentPassword) {
+      alerts.toastError('Current password is required.');
+      return;
+    }
     if (newPassword.length < 8) {
       alerts.toastError('New password must be at least 8 characters.');
       return;
@@ -76,8 +82,9 @@ export default function ProfilePage() {
       return;
     }
     try {
-      await resetPasswordApi({ email: user?.email ?? '', newPassword }).unwrap();
+      await changePasswordApi({ currentPassword, newPassword }).unwrap();
       alerts.toastSuccess('Password updated successfully!');
+      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (err: any) {
@@ -181,6 +188,19 @@ export default function ProfilePage() {
             </CardHeader>
             <CardBody className="space-y-6 pt-6">
               <div className="space-y-6">
+                <Input
+                  label="Current Password"
+                  type={showCurrentPw ? 'text' : 'password'}
+                  placeholder="Enter current password"
+                  value={currentPassword}
+                  onChange={(e: any) => setCurrentPassword(e.target.value)}
+                  suffix={
+                    <button type="button" onClick={() => setShowCurrentPw((v) => !v)} className="text-text-muted hover:text-gray-900 transition-colors">
+                      {showCurrentPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  }
+                  className="bg-[#f2f2f2] border-none text-black h-11"
+                />
                 <Input
                   label="New Password"
                   type={showNewPw ? 'text' : 'password'}
