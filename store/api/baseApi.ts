@@ -10,9 +10,9 @@ export const baseApi = createApi({
   reducerPath: "api",
 
   baseQuery: fetchBaseQuery({
-    // Using '/api/v1' hits the Next.js rewrite (proxy) in next.config.ts,
-    // which forwards to the backend. This prevents third-party cookie blocks.
-    baseUrl: "https://abroz-machinery-server.vercel.app/api/v1",
+    // Using the direct backend API URL as requested by the user.
+    // Note: This may require allowing third-party cookies in browser settings during local development.
+    baseUrl: process.env.NEXT_PUBLIC_API_URL || "https://abroz-machinery-server.vercel.app/api/v1",
 
     // Send cookies with every request so the server can read the `token` cookie
     credentials: "include",
