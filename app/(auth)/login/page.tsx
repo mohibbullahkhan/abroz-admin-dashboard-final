@@ -185,7 +185,6 @@ export default function LoginPage() {
       const response = await loginApi({ email, password }).unwrap();
       console.log("Login response:", response);
       if (response.success && response.data?.token) {
-        document.cookie = `token=${response.data.token}; path=/; max-age=86400`;
         alerts.toastSuccess("Logged in successfully!");
         // window.location.href = '/';
       } else {
