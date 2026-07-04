@@ -185,8 +185,23 @@ export default function LoginPage() {
       const response = await loginApi({ email, password }).unwrap();
       console.log("Login response:", response);
       if (response.success && response.data?.token) {
+        // Set an httpOnly session cookie on the frontend's own domain so
+        // the proxy.ts middleware can detect the logged-in state.
+        // (The backend's own httpOnly cookie lives on the backend's domain
+        // and is used separately for authorizing API requests.)
+        const sessionRes = await fetch("/api/auth/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: response.data.token }),
+        });
+
+        if (!sessionRes.ok) {
+          throw new Error("Failed to establish session");
+        }
+
         alerts.toastSuccess("Logged in successfully!");
-        // window.location.href = '/';
+        router.push("/");
+        router.refresh();
       } else {
         const msg = response.message || "Login failed";
         setLoginError(msg);
@@ -200,6 +215,8 @@ export default function LoginPage() {
           "Network error. Please check your connection or CORS settings.";
       } else if (err.data?.message || err.error) {
         errorMsg = err.data?.message || err.error;
+      } else if (err.message) {
+        errorMsg = err.message;
       }
       setLoginError(errorMsg);
       alerts.toastError(errorMsg);
