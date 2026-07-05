@@ -93,12 +93,28 @@ export const ProductForm = ({ initialData }: ProductFormProps) => {
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
-        if (images.length + files.length > 5) {
-            alerts.error("Max images reached", "You can only upload up to 5 images.");
+        
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        const validFiles = files.filter(file => {
+            if (file.size > maxSize) {
+                alerts.error("File Too Large", `Image "${file.name}" exceeds the maximum limit of 5MB.`);
+                return false;
+            }
+            return true;
+        });
+
+        if (validFiles.length === 0 && files.length > 0) {
+            if (fileInputRef.current) fileInputRef.current.value = '';
             return;
         }
 
-        const base64Promises = files.map(file => {
+        if (images.length + validFiles.length > 5) {
+            alerts.error("Max images reached", "You can only upload up to 5 images.");
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+        }
+
+        const base64Promises = validFiles.map(file => {
             return new Promise<string>((resolve, reject) => {
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
@@ -110,7 +126,7 @@ export const ProductForm = ({ initialData }: ProductFormProps) => {
         try {
             const base64Files = await Promise.all(base64Promises);
             setImages((prev) => [...prev, ...base64Files]);
-            setImageFiles((prev) => [...prev, ...files]);
+            setImageFiles((prev) => [...prev, ...validFiles]);
         } catch (error) {
             alerts.error("Error", "Failed to read image files.");
         }
@@ -136,11 +152,10 @@ export const ProductForm = ({ initialData }: ProductFormProps) => {
         payload.features = features.filter(f => f.trim() !== "");
         payload.status = isDraft ? 'draft' : 'active';
         payload.quantity = Number(quantity);
-        payload.images = images; 
+        payload.images = images; // Array of base64 strings
         payload.categoryId = categoryId;
         payload.condition = condition;
-        
-        // NOTE: New image file uploads would need a separate upload endpoint or base64 implementation.
+
 
         try {
             if (initialData) {
@@ -438,7 +453,7 @@ export const ProductForm = ({ initialData }: ProductFormProps) => {
                                         </label>
                                     )}
                                     <p className="text-xs text-text-muted mt-2">
-                                        The first image will be used as the featured image. Maximum 5 images.
+                                        The first image will be used as the featured image. Maximum 5 images. Highest 5MB per image.
                                     </p>
                                 </div>
                             </CardBody>

@@ -82,6 +82,13 @@ export default function SmsBroadcastPage() {
   const [selectedCategory, setSelectedCategory] = useState<Category>('All');
   const [message, setMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Add Contact Form State
   const [showAddContact, setShowAddContact] = useState(false);
@@ -98,21 +105,25 @@ export default function SmsBroadcastPage() {
   const [isImporting, setIsImporting] = useState(false);
 
   // API hooks
-  const { data: customersData, isLoading: isCustomersLoading } = useGetCustomersQuery();
+  const { data: customersData, isLoading: isCustomersLoading } = useGetCustomersQuery({
+    page: currentPage,
+    limit: 10,
+    search: debouncedSearch || undefined,
+  });
   const [createCustomer, { isLoading: isCreating }] = useCreateCustomerMutation();
   const [createBroadcast, { isLoading: isBroadcasting }] = useCreateBroadcastMutation();
 
   const customers = customersData?.data || [];
+  const meta = customersData?.meta;
+  const totalPages = meta?.totalPages || 1;
+
   const contacts = customers.map(c => ({
     id: c._id,
     name: c.name,
     phone: c.mobileNumber,
     group: 'All', // We don't have group on backend yet
     dateAdded: new Date(c.createdAt).toLocaleDateString()
-  })).filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.phone.includes(searchTerm)
-  );
+  }));
 
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
 
@@ -135,17 +146,21 @@ export default function SmsBroadcastPage() {
       return;
     }
     
-    let formattedPhone = newContactPhone.trim();
-    if (formattedPhone.startsWith('09')) {
+    let cleanName = newContactName.replace(/["']/g, '').trim();
+    let formattedPhone = newContactPhone.replace(/["'\s\-()+]/g, '');
+    
+    if (formattedPhone.startsWith('63')) {
+      formattedPhone = '+' + formattedPhone;
+    } else if (formattedPhone.startsWith('09')) {
       formattedPhone = '+63' + formattedPhone.substring(1);
     } else if (formattedPhone.startsWith('9')) {
       formattedPhone = '+63' + formattedPhone;
-    } else if (!formattedPhone.startsWith('+63')) {
-      formattedPhone = '+63' + formattedPhone.replace(/^\+?/, '');
+    } else {
+      formattedPhone = '+' + formattedPhone;
     }
 
     try {
-      await createCustomer({ name: newContactName, mobileNumber: formattedPhone }).unwrap();
+      await createCustomer({ name: cleanName, mobileNumber: formattedPhone }).unwrap();
       alerts.toastSuccess("Client added successfully!");
       setShowAddContact(false);
       setNewContactName('');
@@ -162,17 +177,22 @@ export default function SmsBroadcastPage() {
     let errorCount = 0;
     for (const item of data) {
       if (!item.name || !item.phone) continue;
-      let formattedPhone = item.phone.trim();
-      if (formattedPhone.startsWith('09')) {
+      
+      let cleanName = item.name.replace(/["']/g, '').trim();
+      let formattedPhone = item.phone.replace(/["'\s\-()+]/g, '');
+      
+      if (formattedPhone.startsWith('63')) {
+        formattedPhone = '+' + formattedPhone;
+      } else if (formattedPhone.startsWith('09')) {
         formattedPhone = '+63' + formattedPhone.substring(1);
       } else if (formattedPhone.startsWith('9')) {
         formattedPhone = '+63' + formattedPhone;
-      } else if (!formattedPhone.startsWith('+63')) {
-        formattedPhone = '+63' + formattedPhone.replace(/^\+?/, '');
+      } else {
+        formattedPhone = '+' + formattedPhone;
       }
 
       try {
-        await createCustomer({ name: item.name.trim(), mobileNumber: formattedPhone }).unwrap();
+        await createCustomer({ name: cleanName, mobileNumber: formattedPhone }).unwrap();
         successCount++;
       } catch (e) {
         errorCount++;
@@ -301,20 +321,18 @@ export default function SmsBroadcastPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center gap-4">
+              <div className="flex items-center gap-4">
                 <div className="relative flex-1">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
                   <input
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setCurrentPage(1);
+                    }}
                     placeholder="Search by name or phone..."
                     className="w-full h-10 pl-10 pr-4 bg-[#f2f2f2] border-none rounded-lg text-sm text-black focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
-                </div>
-                <div className="w-full sm:w-48 shrink-0">
-                  <select className="w-full h-10 px-3 bg-white border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                    <option>Group: All</option>
-                  </select>
                 </div>
               </div>
 
@@ -373,6 +391,44 @@ export default function SmsBroadcastPage() {
                       ))}
                     </tbody>
                   </table>
+                  
+                  {/* Pagination Controls */}
+                  {meta && totalPages > 1 && (
+                    <div className="p-4 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#f8f9fa] text-sm text-text-muted rounded-b-xl">
+                      <div className="font-medium">
+                        Showing {(meta.page - 1) * meta.limit + 1} to {Math.min(meta.page * meta.limit, meta.total)} of <span className="font-bold text-black">{meta.total}</span> contacts
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          className="h-8 px-3 text-xs bg-white border-border hover:bg-black/5 font-semibold" 
+                          disabled={currentPage === 1}
+                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        >
+                          Previous
+                        </Button>
+                        <div className="flex items-center gap-1 overflow-x-auto max-w-[200px] sm:max-w-none no-scrollbar">
+                          {Array.from({ length: totalPages }).map((_, i) => (
+                            <button
+                              key={i}
+                              className={cn("w-8 h-8 rounded-md text-xs font-bold flex items-center justify-center transition-colors shrink-0", currentPage === i + 1 ? "bg-primary text-black shadow-sm" : "bg-white border border-border hover:bg-black/5 text-text-muted")}
+                              onClick={() => setCurrentPage(i + 1)}
+                            >
+                              {i + 1}
+                            </button>
+                          ))}
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          className="h-8 px-3 text-xs bg-white border-border hover:bg-black/5 font-semibold"
+                          disabled={currentPage === totalPages}
+                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -557,10 +613,6 @@ export default function SmsBroadcastPage() {
                         </div>
                         <span className="font-bold text-black text-sm">Send Now</span>
                       </label>
-                      <label className="flex items-center gap-2 cursor-pointer text-text-muted">
-                        <div className="w-5 h-5 rounded-full border-2 border-border" />
-                        <span className="font-medium text-sm">Schedule for Later</span>
-                      </label>
                     </div>
                   </div>
                 </div>
@@ -653,7 +705,7 @@ export default function SmsBroadcastPage() {
                 <label className="text-sm font-medium text-text-muted">Phone Number *</label>
                 <input 
                   value={newContactPhone}
-                  onChange={e => setNewContactPhone(e.target.value)}
+                  onChange={e => setNewContactPhone(e.target.value.replace(/[^0-9+]/g, ''))}
                   placeholder="+63 09XX XXX XXXX" 
                   className="w-full h-10 px-3 bg-[#f2f2f2] border-none rounded-lg text-sm text-black focus:outline-none focus:ring-2 focus:ring-primary/20" 
                 />
@@ -798,7 +850,7 @@ export default function SmsBroadcastPage() {
                           value={row.phone}
                           onChange={(e) => {
                             const newRows = [...manualRows];
-                            newRows[index].phone = e.target.value;
+                            newRows[index].phone = e.target.value.replace(/[^0-9+]/g, '');
                             setManualRows(newRows);
                           }}
                         />

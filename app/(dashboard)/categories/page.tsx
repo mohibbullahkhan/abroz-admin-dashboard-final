@@ -25,7 +25,7 @@ import { Category } from '@/types';
 export default function CategoriesPage() {
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 12;
   const [showAddForm, setShowAddForm] = useState(false);
   const [editCategoryId, setEditCategoryId] = useState<string | null>(null);
   const [newCatName, setNewCatName] = useState('');
