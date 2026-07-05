@@ -73,9 +73,13 @@ export const Sidebar = () => {
     const toggleSidebar = () => setIsCollapsed(!isCollapsed);
     const toggleMobile = () => setIsMobileOpen(!isMobileOpen);
 
-    const handleLogout = () => {
-        document.cookie = "auth=; path=/; max-age=0";
-        router.push("/login");
+    const handleLogout = async () => {
+        try {
+            await fetch('/api/auth/logout', { method: 'POST' });
+        } catch (err) {
+            console.error('Logout failed:', err);
+        }
+        window.location.href = '/login';
     };
 
     return (
