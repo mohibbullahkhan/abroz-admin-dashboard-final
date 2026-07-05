@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import React, { useState } from 'react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/Button';
@@ -30,6 +31,7 @@ import {
 } from '@/store/services/customersApi';
 
 export default function ClientsPage() {
+  const router = useRouter();
   const [showAddContact, setShowAddContact] = useState(false);
   const [showImportContacts, setShowImportContacts] = useState(false);
   const [importTab, setImportTab] = useState<'upload' | 'paste' | 'manual'>('upload');
@@ -44,6 +46,12 @@ export default function ClientsPage() {
   const [editContactPhone, setEditContactPhone] = useState('');
 
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
+
+  // Import State
+  const [pasteName, setPasteName] = useState('');
+  const [pasteText, setPasteText] = useState('');
+  const [uploadData, setUploadData] = useState<{name: string, phone: string}[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
 
   const { data: customersData, isLoading: isCustomersLoading } = useGetCustomersQuery();
   const [createCustomer, { isLoading: isCreating }] = useCreateCustomerMutation();
@@ -130,12 +138,99 @@ export default function ClientsPage() {
     }
   };
 
+  const handleExportCSV = () => {
+    if (contacts.length === 0) return alerts.toastError("No clients to export");
+    const csvContent = "Name,Phone,Group,Date Added\n" + contacts.map(c => `"${c.name}","${c.phone}","${c.group}","${c.dateAdded}"`).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "clients_export.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleImport = async (data: {name: string, phone: string}[]) => {
+    if (data.length === 0) return;
+    setIsImporting(true);
+    let successCount = 0;
+    let errorCount = 0;
+    for (const item of data) {
+      if (!item.name || !item.phone) continue;
+      let formattedPhone = item.phone.trim();
+      if (formattedPhone.startsWith('09')) {
+        formattedPhone = '+63' + formattedPhone.substring(1);
+      } else if (formattedPhone.startsWith('9')) {
+        formattedPhone = '+63' + formattedPhone;
+      } else if (!formattedPhone.startsWith('+63')) {
+        formattedPhone = '+63' + formattedPhone.replace(/^\+?/, '');
+      }
+
+      try {
+        await createCustomer({ name: item.name.trim(), mobileNumber: formattedPhone }).unwrap();
+        successCount++;
+      } catch (e) {
+        errorCount++;
+      }
+    }
+    setIsImporting(false);
+    setShowImportContacts(false);
+    alerts.toastSuccess(`Imported ${successCount} clients. ${errorCount ? `Skipped ${errorCount} invalid/duplicate clients.` : ''}`);
+    setPasteText('');
+    setPasteName('');
+    setUploadData([]);
+    setManualRows([{ id: 1, name: '', phone: '' }, { id: 2, name: '', phone: '' }, { id: 3, name: '', phone: '' }]);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+      if (lines.length < 2) {
+        alerts.error("Invalid File", "File must contain a header row and at least one data row.");
+        return;
+      }
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const nameIdx = headers.indexOf('name');
+      const phoneIdx = headers.findIndex(h => h.includes('phone') || h.includes('mobile'));
+      
+      if (nameIdx === -1 || phoneIdx === -1) {
+        alerts.error("Invalid Format", "CSV must contain 'Name' and 'Phone' headers.");
+        return;
+      }
+      
+      const parsed = lines.slice(1).map(line => {
+        const cols = line.split(',');
+        return { name: cols[nameIdx]?.trim() || '', phone: cols[phoneIdx]?.trim() || '' };
+      }).filter(row => row.name && row.phone);
+      
+      setUploadData(parsed);
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12">
       <PageHeader 
         title="Clients" 
         subtitle="Manage your client database for SMS broadcasts and marketing."
       />
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white border border-border rounded-xl p-5 flex items-center gap-4 shadow-sm">
+          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+            <Users size={24} className="text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-text-muted">Total Clients</p>
+            <h3 className="text-2xl font-bold text-black">{isCustomersLoading ? '-' : contacts.length}</h3>
+          </div>
+        </div>
+      </div>
 
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -147,7 +242,7 @@ export default function ClientsPage() {
               <Upload size={16} /> Import Clients
             </Button>
           </div>
-          <Button variant="outline" className="gap-2 font-medium bg-white border-border w-full sm:w-auto">
+          <Button variant="outline" onClick={handleExportCSV} className="gap-2 font-medium bg-white border-border w-full sm:w-auto">
             <Download size={16} /> Export CSV
           </Button>
         </div>
@@ -184,7 +279,16 @@ export default function ClientsPage() {
             {selectedContacts.length > 0 && (
               <div className="bg-orange-50/50 p-4 border-b border-border flex items-center justify-between">
                 <span className="text-primary font-bold">{selectedContacts.length} clients selected</span>
-                <button onClick={() => setSelectedContacts([])} className="text-sm text-text-muted hover:text-black underline">Clear selection</button>
+                <div className="flex items-center gap-4">
+                  <button onClick={() => setSelectedContacts([])} className="text-sm text-text-muted hover:text-black underline">Clear selection</button>
+                  <Button 
+                    variant="primary" 
+                    className="font-bold py-1.5 px-4 shadow-sm text-xs"
+                    onClick={() => router.push(`/sms-broadcast?step=2&contacts=${selectedContacts.join(',')}`)}
+                  >
+                    Compose SMS &rarr;
+                  </Button>
+                </div>
               </div>
             )}
             <table className="w-full text-left">
@@ -355,50 +459,72 @@ export default function ClientsPage() {
 
             <div className="p-8 overflow-y-auto">
               {importTab === 'upload' && (
-                <div className="border-2 border-dashed border-border/80 rounded-xl p-12 flex flex-col items-center justify-center text-center bg-[#fafafa] transition-colors hover:bg-black/5 cursor-pointer min-h-[300px]">
-                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm border border-border">
-                    <FileSpreadsheet className="text-primary" size={24} />
-                  </div>
-                  <h4 className="font-bold text-black text-lg mb-1">Drag & drop your file here, or click to browse</h4>
-                  <p className="text-sm text-text-muted mb-4">Accepts .csv, .xlsx, .xls</p>
-                  <p className="text-sm text-text-muted max-w-sm">Make sure your file has column headers: <strong>Name</strong>, <strong>Phone</strong>, and <strong>Group</strong> (optional).</p>
-                </div>
-              )}
-
-              {importTab === 'paste' && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-text-muted">Name for all (Optional)</label>
-                      <input placeholder="e.g. Website Lead" className="w-full h-10 px-3 bg-[#f2f2f2] border-none rounded-lg text-sm text-black focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                <div className="space-y-4 relative">
+                  <div className="border-2 border-dashed border-border/80 rounded-xl p-12 flex flex-col items-center justify-center text-center bg-[#fafafa] transition-colors hover:bg-black/5 cursor-pointer min-h-[300px] relative overflow-hidden">
+                    <input type="file" accept=".csv" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+                    <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm border border-border pointer-events-none">
+                      <FileSpreadsheet className="text-primary" size={24} />
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-text-muted">Group (Optional)</label>
-                      <input placeholder="e.g. June Leads" className="w-full h-10 px-3 bg-[#f2f2f2] border-none rounded-lg text-sm text-black focus:outline-none focus:ring-2 focus:ring-primary/20" />
-                    </div>
+                    <h4 className="font-bold text-black text-lg mb-1 pointer-events-none">
+                      {uploadData.length > 0 ? `Loaded ${uploadData.length} clients from CSV` : "Click to browse or drag & drop CSV file"}
+                    </h4>
+                    <p className="text-sm text-text-muted mb-4 pointer-events-none">Accepts .csv</p>
+                    <p className="text-sm text-text-muted max-w-sm pointer-events-none">Make sure your file has column headers: <strong>Name</strong>, <strong>Phone</strong></p>
                   </div>
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <label className="text-sm font-medium text-text-muted">Phone Numbers</label>
-                      <span className="text-xs font-bold text-text-muted">0 valid numbers detected</span>
-                    </div>
-                    <textarea 
-                      placeholder="Paste numbers here... One per line, or comma-separated. e.g. 09171234567 +639181234567" 
-                      className="w-full h-48 p-4 bg-[#f2f2f2] border-none rounded-xl text-sm text-black focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none" 
-                    />
-                  </div>
-                  <Button variant="primary" className="w-full py-3 font-bold opacity-60 pointer-events-none rounded-xl">
-                    Import 0 Numbers
+                  <Button 
+                    variant="primary" 
+                    className="w-full py-3 font-bold rounded-xl"
+                    disabled={uploadData.length === 0 || isImporting}
+                    onClick={() => handleImport(uploadData)}
+                  >
+                    {isImporting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : `Import ${uploadData.length} Clients`}
                   </Button>
                 </div>
               )}
 
-              {importTab === 'manual' && (
-                <div className="space-y-6">
-                  <div className="space-y-1.5 max-w-sm">
-                    <label className="text-sm font-medium text-text-muted">Group for all these clients (Optional)</label>
-                    <input placeholder="e.g. VIP Event" className="w-full h-10 px-3 bg-[#f2f2f2] border-none rounded-lg text-sm text-black focus:outline-none focus:ring-2 focus:ring-primary/20" />
+              {importTab === 'paste' && (() => {
+                const pastedNumbers = pasteText.split(/[\n,]+/).map(t => t.trim()).filter(Boolean);
+                return (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium text-text-muted">Name for all (Optional)</label>
+                        <input 
+                          value={pasteName}
+                          onChange={e => setPasteName(e.target.value)}
+                          placeholder="e.g. Website Lead" 
+                          className="w-full h-10 px-3 bg-[#f2f2f2] border-none rounded-lg text-sm text-black focus:outline-none focus:ring-2 focus:ring-primary/20" 
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-sm font-medium text-text-muted">Phone Numbers</label>
+                        <span className="text-xs font-bold text-text-muted">{pastedNumbers.length} valid numbers detected</span>
+                      </div>
+                      <textarea 
+                        value={pasteText}
+                        onChange={e => setPasteText(e.target.value)}
+                        placeholder="Paste numbers here... One per line, or comma-separated. e.g. 09171234567 +639181234567" 
+                        className="w-full h-48 p-4 bg-[#f2f2f2] border-none rounded-xl text-sm text-black focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none" 
+                      />
+                    </div>
+                    <Button 
+                      variant="primary" 
+                      className={cn("w-full py-3 font-bold rounded-xl", pastedNumbers.length === 0 && "opacity-60 pointer-events-none")}
+                      disabled={pastedNumbers.length === 0 || isImporting}
+                      onClick={() => handleImport(pastedNumbers.map((phone, i) => ({ name: pasteName || `Imported Contact ${i+1}`, phone })))}
+                    >
+                      {isImporting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : `Import ${pastedNumbers.length} Numbers`}
+                    </Button>
                   </div>
+                );
+              })()}
+
+              {importTab === 'manual' && (() => {
+                const validRows = manualRows.filter(r => r.name && r.phone);
+                return (
+                <div className="space-y-6">
                   
                   <div className="space-y-3">
                     {manualRows.map((row, index) => (
@@ -439,11 +565,16 @@ export default function ClientsPage() {
                   >
                     <Plus size={16} /> Add Another Row
                   </Button>
-                  <Button variant="primary" className="w-full py-3 font-bold rounded-xl mt-4">
-                    Import {manualRows.filter(r => r.name && r.phone).length} Clients
+                  <Button 
+                    variant="primary" 
+                    className="w-full py-3 font-bold rounded-xl mt-4"
+                    disabled={validRows.length === 0 || isImporting}
+                    onClick={() => handleImport(validRows)}
+                  >
+                    {isImporting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : `Import ${validRows.length} Clients`}
                   </Button>
                 </div>
-              )}
+              );})()}
             </div>
           </div>
         </div>
