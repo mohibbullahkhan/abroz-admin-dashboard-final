@@ -15,6 +15,12 @@ export interface CategoriesResponse {
   success: boolean;
   message: string;
   data: Category[];
+  meta?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export interface GenericResponse {
@@ -27,7 +33,7 @@ export const categoriesApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
 
     // GET /category
-    getCategories: builder.query<CategoriesResponse, { limit?: number } | void>({
+    getCategories: builder.query<CategoriesResponse, { page?: number; limit?: number; search?: string } | void>({
       query: (params) => ({
         url: '/category',
         params: params ? params : undefined,

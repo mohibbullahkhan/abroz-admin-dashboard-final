@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Plus, 
@@ -24,21 +24,39 @@ import { Category } from '@/types';
 
 export default function CategoriesPage() {
   const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const [showAddForm, setShowAddForm] = useState(false);
   const [editCategoryId, setEditCategoryId] = useState<string | null>(null);
   const [newCatName, setNewCatName] = useState('');
   const [newCatDesc, setNewCatDesc] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  const { data: response, isLoading, isFetching, refetch } = useGetCategoriesQuery();
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (search !== debouncedSearch) {
+        setDebouncedSearch(search);
+        setCurrentPage(1);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [search, debouncedSearch]);
+
+  const { data: response, isLoading, isFetching, refetch } = useGetCategoriesQuery({
+    page: currentPage,
+    limit: itemsPerPage,
+    search: debouncedSearch || undefined,
+  });
   const [createCategory, { isLoading: isCreating }] = useCreateCategoryMutation();
   const [updateCategory, { isLoading: isUpdating }] = useUpdateCategoryMutation();
   const [deleteCategory] = useDeleteCategoryMutation();
 
-  const categories = response?.data || [];
+  const paginatedCategories = response?.data || [];
+  const meta = response?.meta;
+  const totalPages = meta?.totalPages || 0;
+  const totalCategories = meta?.total || 0;
 
-  const filteredCategories = categories.filter(cat => 
-    cat.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const paginationRange = Array.from({ length: totalPages }, (_, i) => i + 1);
 
   const handleDelete = async (id: string, name: string) => {
     if (await alerts.confirmDelete(name)) {
@@ -169,12 +187,15 @@ export default function CategoriesPage() {
           <input 
             placeholder="Search categories..." 
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setCurrentPage(1);
+            }}
             className="bg-transparent border-none focus:outline-none text-sm w-full text-text-primary placeholder:text-text-muted"
           />
         </div>
         <div className="text-sm text-text-muted">
-          Showing {filteredCategories.length} categories
+          Showing {totalCategories} categories
         </div>
       </div>
 
@@ -182,13 +203,14 @@ export default function CategoriesPage() {
         <div className="flex justify-center items-center py-20">
           <Loader2 className="animate-spin text-primary w-8 h-8" />
         </div>
-      ) : filteredCategories.length === 0 ? (
+      ) : paginatedCategories.length === 0 ? (
         <div className="text-center py-20 text-text-muted">
           No categories found.
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredCategories.map((cat) => (
+          {paginatedCategories.map((cat) => (
             <Card key={cat._id} hoverable className="group overflow-hidden border-border/40 hover:border-border transition-all duration-300 shadow-sm bg-white">
               <CardBody className="p-6 h-full flex flex-col">
                 <div className="flex justify-end gap-2 mb-2">
@@ -228,6 +250,48 @@ export default function CategoriesPage() {
             </Card>
           ))}
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-4 mt-6 border-t border-border/50">
+            <p className="text-sm text-text-muted">
+              Showing page {currentPage} of {totalPages}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                className="w-8 h-8 rounded-md bg-white/5 border-border"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              >
+                &lt;
+              </Button>
+              <div className="flex items-center gap-1">
+                {paginationRange.map((idx) => (
+                  <Button
+                    key={idx}
+                    variant={currentPage === idx ? "primary" : "ghost"}
+                    size="icon"
+                    className={`w-8 h-8 text-sm rounded-md font-medium ${currentPage === idx ? "text-black bg-primary" : "text-text-primary hover:bg-white/10"}`}
+                    onClick={() => setCurrentPage(idx)}
+                  >
+                    {idx}
+                  </Button>
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                className="w-8 h-8 rounded-md bg-white/5 border-border"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+              >
+                &gt;
+              </Button>
+            </div>
+          </div>
+        )}
+        </>
       )}
     </div>
   );
