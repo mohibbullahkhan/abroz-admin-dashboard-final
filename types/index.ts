@@ -24,13 +24,12 @@ export interface Product {
   brandName: string;
   quantity: number;
   categoryId: string | Category;
-  condition: 'used' | 'new';
+  condition: "used" | "new";
   compatibility: string;
   description: string;
   features: string[];
   shippingInfo: string;
-  conditionNotes: string;
-  status: 'active' | 'inactive' | 'draft';
+  status: "active" | "inactive" | "draft";
   images: string[];
   analytics?: {
     totalClicks: number;
@@ -76,7 +75,7 @@ export interface ProductClickDay {
 
 export interface ActivityItem {
   id: string;
-  method: 'create' | 'update' | 'delete';
+  method: "create" | "update" | "delete";
   description: string;
   createdAt: string;
 }
